@@ -5,12 +5,17 @@ from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
 from flask_mail import Mail
+import sys
 
 load_dotenv()
 
 db = SQLAlchemy()
 jwt = JWTManager()
 mail = Mail()
+
+
+print("PYTHON VERSION:", sys.version)
+
 
 def create_app():
     app = Flask(__name__)
