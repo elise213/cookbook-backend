@@ -10,10 +10,7 @@ from src.models import db, User
 from app import mail
 import os
 import stripe
-import secrets
-import string
 from src.send_email import send_email
-
 
 
 # Constants
