@@ -347,3 +347,13 @@ def check_password_gate():
 @api.route("/", methods=["GET"])
 def root():
     return jsonify({"message": "API is working!"})
+
+
+
+@api.route("/debug-cors", methods=["GET", "OPTIONS"])
+def debug_cors():
+    from flask import request
+    return jsonify({
+        "Origin": request.headers.get("Origin"),
+        "Access-Control-Allow-Origin": request.headers.get("Access-Control-Allow-Origin"),
+    })
