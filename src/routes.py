@@ -352,8 +352,8 @@ def root():
 
 @api.route("/debug-cors", methods=["GET", "OPTIONS"])
 def debug_cors():
-    from flask import request
+    origin = request.headers.get("Origin")
     return jsonify({
-        "Origin": request.headers.get("Origin"),
-        "Access-Control-Allow-Origin": request.headers.get("Access-Control-Allow-Origin"),
+        "Received-Origin-Header": origin,
+        "CORS-Allow-Origin-Should-Be": "https://zesty-phoenix-8cec46.netlify.app"
     })
