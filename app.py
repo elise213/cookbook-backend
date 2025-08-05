@@ -19,7 +19,11 @@ def create_app():
     db.init_app(app)
     jwt.init_app(app)
 
-    CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
+    CORS(app, supports_credentials=True, origins=[
+        "http://localhost:3000",  # local dev
+        "https://zesty-phoenix-8cec46.netlify.app"  # Netlify deployed 
+    ])
+
 
     @app.after_request
     def apply_cors_headers(response):
