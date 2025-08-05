@@ -14,6 +14,8 @@ import secrets
 import string
 from src.send_email import send_email
 
+
+
 # Constants
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -157,67 +159,84 @@ def reset_password():
 
 # ------------------------
 # Stripe Webhook
-# ------------------------
+# ------------------------@api.route("/stripe-webhook", methods=["POST"])
+
+
 @api.route("/stripe-webhook", methods=["POST"])
 def stripe_webhook():
-    print("✅ Webhook endpoint triggered")
-    testing_mode = request.headers.get("X-Test-Mode") == "true"
+    import secrets, string
 
-    if testing_mode:
+    payload = request.data
+    sig_header = request.headers.get("Stripe-Signature")
+    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        print("✅ Webhook event received:", event.get("type"))
+    except Exception as e:
+        print("❌ Webhook error:", str(e))
+        return jsonify(success=False), 400
+
+    if event.get("type") == "checkout.session.completed":
         try:
-            data = request.get_json()
-            event = {
-                "type": "checkout.session.completed",
-                "data": {
-                    "object": {
-                        "customer_email": data.get("data", {}).get("object", {}).get("customer_email", "testuser@example.com")
-                    }
-                }
-            }
-        except Exception as e:
-            return jsonify({"error": "Malformed test data"}), 400
-    else:
-        payload = request.get_data(as_text=True)
-        sig_header = request.headers.get("Stripe-Signature")
-        try:
-            event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-        except Exception as e:
-            return jsonify({"error": str(e)}), 400
+            session = event.get("data", {}).get("object", {})
+            print("📦 Checkout session object:", session)
 
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        customer_email = session.get("customer_email")
-        if not customer_email:
-            return jsonify({"error": "No email found"}), 400
-
-        username = f"user_{secrets.token_hex(4)}"
-        raw_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
-        hashed_password = generate_password_hash(raw_password)
-
-        existing_user = User.query.filter_by(email=customer_email).first()
-        if not existing_user:
-            new_user = User(
-                name=username,
-                email=customer_email,
-                password=hashed_password,
-                is_org=False
+            customer_email = (
+                session.get("customer_email") or
+                session.get("customer_details", {}).get("email")
             )
-            db.session.add(new_user)
-            db.session.commit()
 
-        subject = "Welcome to Fatima’s Cookbook"
-        body = f"""
-         <p>Thank you for your purchase!</p>
-        <p>You now have access to the cookbook.</p>
-        <p><strong>Login:</strong> <a href="https://zesty-phoenix-8cec46.netlify.app/login">Login</a></p>
-        <p><strong>Email:</strong> {customer_email}<br>
-        <strong>Password:</strong> {raw_password}</p>
-        <p>Best,<br>Recipes from Rafah</p>
-        """
+            if not customer_email:
+                print("❌ No customer_email found anywhere!")
+                return jsonify({"error": "No email found"}), 400
 
-        send_email(customer_email, subject, body)
+
+            print(f"🎉 Payment complete for: {customer_email}")
+
+            # Generate credentials
+            username = f"user_{secrets.token_hex(4)}"
+            raw_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+            hashed_password = generate_password_hash(raw_password)
+
+            # Check if user exists
+            existing_user = User.query.filter_by(email=customer_email).first()
+            if not existing_user:
+                new_user = User(
+                    name=username,
+                    email=customer_email,
+                    password=hashed_password,
+                    is_org=False
+                )
+                db.session.add(new_user)
+                db.session.commit()
+                print(f"✅ New user created: {username}")
+            else:
+                print(f"ℹ️ User already exists: {existing_user.email}")
+
+            # Send credentials by email
+            subject = "Welcome to Fatima’s Cookbook"
+            body = f"""
+            <p>Thank you for your purchase!</p>
+            <p>You now have access to the cookbook.</p>
+            <p><strong>Login:</strong> <a href="https://zesty-phoenix-8cec46.netlify.app/login">Login</a></p>
+            <p><strong>Email:</strong> {customer_email}<br>
+            <strong>Password:</strong> {raw_password}</p>
+            <p>To change your password, visit: <a href="https://zesty-phoenix-8cec46.netlify.app/forgotpassword">Change Password</a></p>
+            <p>Best,<br>Recipes from Rafah</p>
+            """
+
+            send_email(customer_email, subject, body)
+            print("📧 Email sent!")
+
+        except Exception as e:
+            print("❌ Error processing checkout.session.completed:", str(e))
+            return jsonify({"error": str(e)}), 500
 
     return jsonify({"status": "success"}), 200
+
+
+
 
 # ------------------------
 # Create Checkout Session
