@@ -223,14 +223,7 @@ def stripe_webhook():
 # Create Checkout Session
 # ------------------------
 @api.route("/create-checkout-session", methods=["POST"])
-@jwt_required()
 def create_checkout_session():
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-
     data = request.get_json()
     amount = data.get("amount", 2000)
     product_name = data.get("product_name", "Fatima's Cookbook")
@@ -239,7 +232,8 @@ def create_checkout_session():
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             mode="payment",
-            customer_email=user.email,
+            customer_creation="if_required",  # Optional: helps create customer records
+            customer_email=None,  # ❌ Don't pass it — let Stripe collect it
             line_items=[{
                 "price_data": {
                     "currency": "usd",
@@ -250,14 +244,16 @@ def create_checkout_session():
                 },
                 "quantity": 1,
             }],
-             success_url="https://zesty-phoenix-8cec46.netlify.app/success",
-             cancel_url="https://zesty-phoenix-8cec46.netlify.app/cancel",
+            success_url="https://zesty-phoenix-8cec46.netlify.app/success",
+            cancel_url="https://zesty-phoenix-8cec46.netlify.app/cancel",
         )
 
         return jsonify({"url": session.url}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
 
 # ------------------------
 # Password Gate
