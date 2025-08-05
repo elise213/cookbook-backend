@@ -10,7 +10,7 @@ from flask_mail import Message
 from datetime import timedelta
 from src.models import db, User
 import os
-from src.app import mail
+from app import mail
 import stripe
 import secrets
 import string
