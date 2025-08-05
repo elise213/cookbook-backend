@@ -20,9 +20,9 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET") 
 api = Blueprint("api", __name__)
 
-# ------------------------
+
 # Register New User
-# ------------------------
+
 @api.route("/createUser", methods=["POST"])
 def create_user():
     data = request.get_json()
