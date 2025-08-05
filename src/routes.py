@@ -232,8 +232,7 @@ def create_checkout_session():
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             mode="payment",
-            customer_creation="if_required",  # Optional: helps create customer records
-            customer_email=None,  # ❌ Don't pass it — let Stripe collect it
+            customer_creation="if_required", 
             line_items=[{
                 "price_data": {
                     "currency": "usd",
@@ -245,13 +244,14 @@ def create_checkout_session():
                 "quantity": 1,
             }],
             success_url="https://zesty-phoenix-8cec46.netlify.app/success",
-            cancel_url="https://zesty-phoenix-8cec46.netlify.app/cancel",
+            cancel_url="https://zesty-phoenix-8cec46.netlify.app/", 
         )
 
         return jsonify({"url": session.url}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 
