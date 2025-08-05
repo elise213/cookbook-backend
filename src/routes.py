@@ -3,26 +3,31 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import (
     create_access_token, set_access_cookies, jwt_required, get_jwt_identity, decode_token
 )
-from flask import make_response, jsonify, request
 from flask_cors import cross_origin
-
 from flask_mail import Message
 from datetime import timedelta
 from src.models import db, User
-import os
 from app import mail
+import os
 import stripe
 import secrets
 import string
+from src.send_email import send_email
 
+# Constants
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://zesty-phoenix-8cec46.netlify.app"
+]
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET") 
+endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
 api = Blueprint("api", __name__)
 
-
-# Register New User
-
+# ------------------------
+# Register User
+# ------------------------
 @api.route("/createUser", methods=["POST"])
 def create_user():
     data = request.get_json()
@@ -45,10 +50,6 @@ def create_user():
 # ------------------------
 # Login User (JWT via Cookie)
 # ------------------------
-
-
-
-
 @api.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -57,7 +58,7 @@ def login():
     if not user or not check_password_hash(user.password, data.get("password")):
         return jsonify({"error": "Invalid credentials"}), 401
 
-    access_token = create_access_token(identity=str(user.id)) 
+    access_token = create_access_token(identity=str(user.id))
     response = make_response(jsonify({
         "message": f"Welcome back, {user.name}!",
         "user": user.serialize()
@@ -65,13 +66,11 @@ def login():
     set_access_cookies(response, access_token)
     return response
 
-
-
 # ------------------------
-# Protected Route (requires login)
+# Protected Route
 # ------------------------
 @api.route("/protected", methods=["GET", "OPTIONS"])
-@cross_origin(supports_credentials=True, origins=["http://localhost:3000"])
+@cross_origin(supports_credentials=True, origins=ALLOWED_ORIGINS)
 @jwt_required()
 def protected():
     if request.method == "OPTIONS":
@@ -92,13 +91,11 @@ def protected():
         }
     })
 
-
-
-
-
-
-from src.send_email import send_email  # make sure this path matches your project
-
+# ------------------------
+# Forgot Password
+# ------------------------# ------------------------
+# Forgot Password
+# ------------------------
 @api.route("/forgot-password", methods=["POST"])
 def forgot_password():
     data = request.get_json()
@@ -110,12 +107,8 @@ def forgot_password():
     if not user:
         return jsonify({"error": "No user found with that email"}), 404
 
-    token = create_access_token(
-    identity=str(user.id),  # ✅ force it to a string
-    expires_delta=timedelta(minutes=30)
-)
-
-    reset_link = f"http://localhost:3000/resetpassword?token={token}"
+    token = create_access_token(identity=str(user.id), expires_delta=timedelta(minutes=30))
+    reset_link = f"https://zesty-phoenix-8cec46.netlify.app/resetpassword?token={token}"
 
     subject = "Password Reset Request"
     body = f"""
@@ -136,61 +129,41 @@ def forgot_password():
         "reset_link": reset_link
     }), 200
 
-
-
+# ------------------------
+# Reset Password
 # ------------------------
 @api.route("/reset-password", methods=["POST"])
 def reset_password():
     data = request.get_json()
-    print("📥 Received reset-password payload:", data)
-
     token = data.get("token")
     new_password = data.get("new_password")
 
     if not token or not new_password:
-        print("❌ Missing token or new_password")
         return jsonify({"error": "Token and new password are required"}), 400
 
     try:
-        print("🔐 Decoding token...")
         decoded = decode_token(token)
-        print("✅ Token decoded:", decoded)
-
-        user_id = decoded.get("sub")  # now a string
-        print("👤 Extracted user_id:", user_id)
-
+        user_id = decoded.get("sub")
         user = User.query.get(int(user_id))
         if not user:
-            print("❌ User not found for ID:", user_id)
             return jsonify({"error": "User not found"}), 404
 
-        print("🔄 Updating password...")
         user.password = generate_password_hash(new_password)
         db.session.commit()
-
-        print("✅ Password reset successful for user:", user.email)
         return jsonify({"message": "Password updated successfully"}), 200
 
     except Exception as e:
-        print("❌ Exception during reset-password:", str(e))
         return jsonify({"error": "Invalid or expired token"}), 400
 
-
-
-
-
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-
-
+# ------------------------
+# Stripe Webhook
+# ------------------------
 @api.route("/stripe-webhook", methods=["POST"])
 def stripe_webhook():
     print("✅ Webhook endpoint triggered")
-
     testing_mode = request.headers.get("X-Test-Mode") == "true"
 
     if testing_mode:
-        print("🧪 Running in test mode (curl)")
         try:
             data = request.get_json()
             event = {
@@ -202,97 +175,67 @@ def stripe_webhook():
                 }
             }
         except Exception as e:
-            print("❌ Failed to parse test payload:", str(e))
             return jsonify({"error": "Malformed test data"}), 400
-
     else:
         payload = request.get_data(as_text=True)
         sig_header = request.headers.get("Stripe-Signature")
-
         try:
             event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-        except ValueError as e:
-            print("❌ Invalid payload:", str(e))
-            return jsonify({"error": "Invalid payload"}), 400
-        except stripe.error.SignatureVerificationError as e:
-            print("❌ Invalid signature:", str(e))
-            return jsonify({"error": "Invalid signature"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
 
-    # Handle the event
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-        print("✅ Stripe session completed:", session)
-
         customer_email = session.get("customer_email")
-        print("📧 Email from Stripe:", customer_email)
-
         if not customer_email:
-            print("❌ No email provided — cannot proceed")
             return jsonify({"error": "No email found"}), 400
 
-        # Generate random credentials
         username = f"user_{secrets.token_hex(4)}"
         raw_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
         hashed_password = generate_password_hash(raw_password)
-        email = customer_email
 
-        existing_user = User.query.filter_by(email=email).first()
-
-        if existing_user:
-            print(f"⚠️ User already exists: {email}")
-        else:
+        existing_user = User.query.filter_by(email=customer_email).first()
+        if not existing_user:
             new_user = User(
                 name=username,
-                email=email,
+                email=customer_email,
                 password=hashed_password,
                 is_org=False
             )
             db.session.add(new_user)
             db.session.commit()
-            print(f"✅ New user created: {email}")
 
-        # Send welcome email
         subject = "Welcome to Fatima’s Cookbook"
         body = f"""
-        <p>Thank you for your purchase!</p>
+         <p>Thank you for your purchase!</p>
         <p>You now have access to the cookbook.</p>
-        <p><strong>Login:</strong> <a href="http://localhost:3000/login">http://localhost:3000/login</a></p>
-        <p><strong>Email:</strong> {email}<br>
+        <p><strong>Login:</strong> <a href="https://zesty-phoenix-8cec46.netlify.app/login">Login</a></p>
+        <p><strong>Email:</strong> {customer_email}<br>
         <strong>Password:</strong> {raw_password}</p>
         <p>Best,<br>Recipes from Rafah</p>
         """
 
-        result = send_email(email, subject, body)
-        if result == "Email sent successfully!":
-            print("📨 Welcome email sent")
-        else:
-            print(f"❌ Email sending failed: {result}")
+        send_email(customer_email, subject, body)
 
     return jsonify({"status": "success"}), 200
 
-
 # ------------------------
-# Create Stripe Checkout Session
+# Create Checkout Session
 # ------------------------
 @api.route("/create-checkout-session", methods=["POST"])
 @jwt_required()
 def create_checkout_session():
-    print("🧾 Received create-checkout-session request")
-
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
 
     if not user:
-        print("❌ User not found")
         return jsonify({"error": "User not found"}), 404
 
     data = request.get_json()
-    amount = data.get("amount", 2000)  # Default to $20
+    amount = data.get("amount", 2000)
     product_name = data.get("product_name", "Fatima's Cookbook")
 
     try:
-        print(f"📦 Creating session for {user.email}, amount: {amount}")
-
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             mode="payment",
@@ -307,22 +250,20 @@ def create_checkout_session():
                 },
                 "quantity": 1,
             }],
-            success_url="http://localhost:3000/success",
-            cancel_url="http://localhost:3000/cancel",
+             success_url="https://zesty-phoenix-8cec46.netlify.app/success",
+             cancel_url="https://zesty-phoenix-8cec46.netlify.app/cancel",
         )
 
-        print("✅ Stripe session created successfully")
         return jsonify({"url": session.url}), 200
 
     except Exception as e:
-        print("❌ Stripe session creation failed:", str(e))
         return jsonify({"error": str(e)}), 500
 
 # ------------------------
-# Check Simple Password Gate
+# Password Gate
 # ------------------------
 @api.route("/check-password", methods=["POST", "OPTIONS"])
-@cross_origin(supports_credentials=True, origins=["http://localhost:3000"])
+@cross_origin(supports_credentials=True, origins=ALLOWED_ORIGINS)
 def check_password_gate():
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS preflight success"}), 200
@@ -334,7 +275,6 @@ def check_password_gate():
         return jsonify({"error": "Password is required"}), 400
 
     correct_password = os.getenv("SITE_PASSWORD")
-
     if not correct_password:
         return jsonify({"error": "Server misconfiguration"}), 500
 
@@ -343,12 +283,12 @@ def check_password_gate():
     else:
         return jsonify({"success": False}), 401
 
-
+# ------------------------
+# Misc
+# ------------------------
 @api.route("/", methods=["GET"])
 def root():
     return jsonify({"message": "API is working!"})
-
-
 
 @api.route("/debug-cors", methods=["GET", "OPTIONS"])
 def debug_cors():

@@ -19,7 +19,7 @@ def create_app():
     db.init_app(app)
     jwt.init_app(app)
 
-    # ✅ Let Flask-CORS do all the work
+
     CORS(app, supports_credentials=True, origins=[
         "http://localhost:3000",
         "https://zesty-phoenix-8cec46.netlify.app"
