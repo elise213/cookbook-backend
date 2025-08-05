@@ -19,21 +19,11 @@ def create_app():
     db.init_app(app)
     jwt.init_app(app)
 
+    # ✅ Let Flask-CORS do all the work
     CORS(app, supports_credentials=True, origins=[
-        "http://localhost:3000",  # local dev
-        "https://zesty-phoenix-8cec46.netlify.app"  # Netlify deployed 
+        "http://localhost:3000",
+        "https://zesty-phoenix-8cec46.netlify.app"
     ])
-
-
-    @app.after_request
-    def apply_cors_headers(response):
-        origin = request.headers.get("Origin")
-        if origin in ["http://localhost:3000", "https://zesty-phoenix-8cec46.netlify.app"]:
-            response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
-        response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
-        return response
 
     from src.routes import api
     app.register_blueprint(api, url_prefix="/api")
