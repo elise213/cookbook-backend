@@ -14,5 +14,5 @@ class Config:
     JWT_ACCESS_COOKIE_NAME = "access_token_cookie"
     JWT_COOKIE_CSRF_PROTECT = False
     JWT_COOKIE_SAMESITE = "Lax"
-    JWT_COOKIE_SECURE = False  # True ONLY if using HTTPS
+    JWT_COOKIE_SECURE = True  # True ONLY if using HTTPS
     JWT_ACCESS_COOKIE_PATH = "/"
