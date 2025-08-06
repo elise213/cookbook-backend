@@ -26,9 +26,12 @@ def create_app():
 
 
     CORS(app, supports_credentials=True, origins=[
-        "http://localhost:3000",
-        "https://zesty-phoenix-8cec46.netlify.app"
+        "http://localhost:3000",  # Local dev
+        "https://recipesforrafah.com",  # Primary production domain (HTTPS only)
+        "http://recipesforrafah.com",   # Optional, for safety (HTTP redirect)
+        "https://www.recipesforrafah.com",  # Just in case someone hits the www version
     ])
+
 
     from src.routes import api
     app.register_blueprint(api, url_prefix="/api")

@@ -16,7 +16,9 @@ from src.send_email import send_email
 # Constants
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://zesty-phoenix-8cec46.netlify.app"
+    "https://recipesforrafah.com",
+    "http://recipesforrafah.com",
+    "https://www.recipesforrafah.com",
 ]
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
