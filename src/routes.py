@@ -314,26 +314,20 @@ def check_password_gate():
 def root():
     return jsonify({"message": "API is working!"})
 
-@api.route("/debug-cors", methods=["GET", "OPTIONS"])
-def debug_cors():
-    origin = request.headers.get("Origin")
-    return jsonify({
-        "Received-Origin-Header": origin,
-        "CORS-Allow-Origin-Should-Be": "https://zesty-phoenix-8cec46.netlify.app"
-    })
+# @api.route("/debug-cors", methods=["GET", "OPTIONS"])
+# def debug_cors():
+#     origin = request.headers.get("Origin")
+#     return jsonify({
+#         "Received-Origin-Header": origin,
+#         "CORS-Allow-Origin-Should-Be": "https://zesty-phoenix-8cec46.netlify.app"
+#     })
 
-@api.route("/debug", methods=["POST"])
-def debug():
-    try:
-        data = request.get_json()
-        print("Received JSON:", data)
-        return jsonify({"status": "ok", "received": data}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# @api.route("/debug", methods=["POST"])
+# def debug():
+#     try:
+#         data = request.get_json()
+#         print("Received JSON:", data)
+#         return jsonify({"status": "ok", "received": data}), 200
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
-
-@api.route("/init-db", methods=["GET"])
-def init_db():
-    from src.models import db
-    db.create_all()
-    return "✅ Database initialized!", 200
