@@ -34,6 +34,7 @@ def create_app():
 
 
     from src.routes import api
+    
     app.register_blueprint(api, url_prefix="/api")
 
     app.config.update(
