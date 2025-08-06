@@ -31,22 +31,32 @@ api = Blueprint("api", __name__)
 # ------------------------
 @api.route("/createUser", methods=["POST"])
 def create_user():
-    data = request.get_json()
-    if not data.get("email") or not data.get("password") or not data.get("name"):
-        return jsonify({"error": "Missing required fields"}), 400
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON received"}), 400
 
-    if User.query.filter_by(email=data["email"]).first():
-        return jsonify({"error": "Email already exists"}), 400
+        if not data.get("email") or not data.get("password") or not data.get("name"):
+            return jsonify({"error": "Missing required fields"}), 400
 
-    user = User(
-        name=data["name"],
-        email=data["email"],
-        password=generate_password_hash(data["password"]),
-        is_org=data.get("is_org", False)
-    )
-    db.session.add(user)
-    db.session.commit()
-    return jsonify({"message": "User created successfully"}), 201
+        if User.query.filter_by(email=data["email"]).first():
+            return jsonify({"error": "Email already exists"}), 400
+
+        user = User(
+            name=data["name"],
+            email=data["email"],
+            password=generate_password_hash(data["password"]),
+            is_org=data.get("is_org", False)
+        )
+        db.session.add(user)
+        db.session.commit()
+
+        return jsonify({"message": "User created successfully"}), 201
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
 
 # ------------------------
 # Login User (JWT via Cookie)
@@ -311,3 +321,12 @@ def debug_cors():
         "Received-Origin-Header": origin,
         "CORS-Allow-Origin-Should-Be": "https://zesty-phoenix-8cec46.netlify.app"
     })
+
+@api.route("/debug", methods=["POST"])
+def debug():
+    try:
+        data = request.get_json()
+        print("Received JSON:", data)
+        return jsonify({"status": "ok", "received": data}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
