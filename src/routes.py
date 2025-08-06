@@ -330,3 +330,10 @@ def debug():
         return jsonify({"status": "ok", "received": data}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@api.route("/init-db")
+def init_db():
+    from src.models import db
+    db.create_all()
+    return "Database initialized!"
